@@ -1,0 +1,17 @@
+# APPのオーナー
+App/common/ @infra-faci-pf/team-3 
+
+App/config/ @infra-faci-pf/team-3 
+
+App/core/ @infra-faci-pf/team-3 
+
+App/functions/ @infra-faci-pf/team-3 
+
+App/util/ @infra-faci-pf/team-3 
+
+# deployのオーナー
+deploy/dev/ @infra-faci-pf/team-3 
+
+deploy/prd/ @infra-faci-pf/team-3 
+
+deploy/stg/ @infra-faci-pf/team-3 
