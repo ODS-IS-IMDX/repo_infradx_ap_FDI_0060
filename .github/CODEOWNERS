@@ -1,4 +1,4 @@
-# APPのオーナー
+# APPのオーナー(プロパ(@infra-faci-pf/team-3)に設定)
 App/common/ @infra-faci-pf/team-3 
 
 App/config/ @infra-faci-pf/team-3 
@@ -9,7 +9,7 @@ App/functions/ @infra-faci-pf/team-3
 
 App/util/ @infra-faci-pf/team-3 
 
-# deployのオーナー
+# deployのオーナー(プロパ(@infra-faci-pf/team-3)に設定)
 deploy/dev/ @infra-faci-pf/team-3 
 
 deploy/prd/ @infra-faci-pf/team-3 
