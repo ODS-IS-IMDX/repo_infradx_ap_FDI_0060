@@ -1,0 +1,22 @@
+name: 'call_workflow_Upload Python files to ec2'
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'App/functions/**'
+  workflow_dispatch:
+  
+jobs:
+  call-workflow:
+    uses: infra-faci-pf/repo_infradx_cicd_main/.github/workflows/[digiline_dev]called_py_workflow.yml@main
+    secrets: inherit
+    with:
+      AWS_ACCOUNT: 814396194035                                # AWSアカウントID
+      IAM_ROLE_NAME: infradx-dev-iam-role-oidc                 # IAM Role名を記載
+      instance-id: "i-0be9d3845dd335f6c"
+      bucket-name: "sentan-python-app-deploy-test-bucket"
+      path: "App/functions/"
+      repo: "repo_infradx_ap_FDI_0060"
+      file-name: "FDI_0020.py"
