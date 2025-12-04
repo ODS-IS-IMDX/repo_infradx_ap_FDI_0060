@@ -1,17 +1,2 @@
-# APPのオーナー(プロパ(@infra-faci-pf/team-3)に設定)
-App/common/ @infra-faci-pf/team-3 
-
-App/config/ @infra-faci-pf/team-3 
-
-App/core/ @infra-faci-pf/team-3 
-
-App/functions/ @infra-faci-pf/team-3 
-
-App/util/ @infra-faci-pf/team-3 
-
-# deployのオーナー(プロパ(@infra-faci-pf/team-3)に設定)
-deploy/dev/ @infra-faci-pf/team-3 
-
-deploy/prd/ @infra-faci-pf/team-3 
-
-deploy/stg/ @infra-faci-pf/team-3 
+# APPのオーナー(プロパ(@infra-faci-pf/team-3)と業務Gリーダー(@infra-faci-pf/g)に設定)
+App/ @infra-faci-pf/team-3 @infra-faci-pf/g
