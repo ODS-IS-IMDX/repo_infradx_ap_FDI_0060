@@ -15,7 +15,7 @@ jobs:
     with:
       AWS_ACCOUNT: 161479556163                                      # AWSアカウントID
       IAM_ROLE_NAME: infradx-stg-iam-role-oidc                       # IAM Role名
-      INSTANCE_ID: "                   "                             # インスタンスID
+      INSTANCE_ID: ""                                                # インスタンスID
       BUCKET_NAME: "infradx-stg-s3-bckt-cicd-161479556163"           # S3バケット名
       REPO_PATH: "App/functions/"                                    # リポジトリパス
       REPO: "repo_infradx_ap_FDI_0060"                               # リポジトリ名
