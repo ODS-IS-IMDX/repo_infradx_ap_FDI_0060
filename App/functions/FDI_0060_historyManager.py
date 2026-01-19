@@ -2,7 +2,7 @@
 FDI_0060_historyManager.py
 
 処理名:
-    履歴管理
+    データ登録
 
 概要:
     ・設備データ管理マスタDBから設備データのダンプファイルを取得し、履歴管理用ストレージにアップロードする。
@@ -34,10 +34,6 @@ from util.updateImportManagement import update_import_management
 log_manager = LogManager()
 logger = log_manager.get_logger("FDI_0060_履歴管理")
 config = read_config(logger)
-
-AWS_REGION = config["aws"]["region"].strip()
-SHAPEFILE_DIR_PATH = config["folderPass"]["shapefile_dir_path"].strip()
-PRE_IMPORT_SHAPEFILE_DIR_PATH = config["aws"]["pre_import_shapefile_dir_path"].strip()
 
 # secret_nameをconfigから取得し、secret_propsにAWS Secrets Managerの値を格納
 secret_name = config["aws"]["secret_name"]
