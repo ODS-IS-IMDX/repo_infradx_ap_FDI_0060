@@ -2,7 +2,7 @@
 FDI_0060_historyManager.py
 
 処理名:
-    データ登録
+    履歴管理
 
 概要:
     ・設備データ管理マスタDBから設備データのダンプファイルを取得し、履歴管理用ストレージにアップロードする。
@@ -15,6 +15,7 @@ FDI_0060_historyManager.py
 """
 
 import argparse
+import os
 import re
 import subprocess
 import tempfile
@@ -27,7 +28,6 @@ from core.database import Database
 from core.logger import LogManager
 from core.message import get_message
 from core.secretProperties import SecretPropertiesSingleton
-from psycopg import ClientCursor
 from util.getImportManagementTableName import get_import_management_table_name
 from util.updateImportManagement import update_import_management
 
@@ -44,6 +44,7 @@ db_mst_schema = secret_props.get("db_mst_schema")
 # シークレットマネージャーから履歴管理用ストレージ(S3)バケット名を取得
 history_bucket_name = secret_props.get("history_bucket_name")
 
+AWS_REGION = config["aws"]["region"].strip()
 CODE_LIST = {
     "import_id": "取込ID",
 }
@@ -91,7 +92,7 @@ def validate_inputs(import_id_param):
     return import_ids
 
 
-# 2. 公益事業者・道路管理者ID、設備小項目を取得
+# 2. 取込管理内テーブル名取得
 def get_import_management_tables(import_ids):
     db_connection = Database.get_mstdb_connection(logger)
     fac_tables = {}
@@ -131,7 +132,7 @@ def get_import_management_tables(import_ids):
 # 3. 設備データのダンプファイル取得・アップロード
 def upload_fac_dump_files(import_ids, fac_tables):
     # S3クライアント作成
-    s3 = boto3.client("s3", region_name="ap-northeast-1")
+    s3 = boto3.client("s3", region_name=AWS_REGION)
     # アップロード済み取込IDリスト
     uploaded_import_ids = []
 
@@ -140,6 +141,10 @@ def upload_fac_dump_files(import_ids, fac_tables):
         key = f"{fac_data_master_table_name}/dump_{import_id}.dmp"
         cmd = [
             "pg_dump",
+            "-h",
+            secret_props.get("db_host"),
+            "-p",
+            secret_props.get("db_port"),
             "-U",
             secret_props.get("db_user"),
             "-d",
@@ -150,9 +155,13 @@ def upload_fac_dump_files(import_ids, fac_tables):
             "c",
         ]
 
+        # 環境変数にパスワードを設定
+        env = os.environ.copy()
+        env["PGPASSWORD"] = secret_props.get("db_password")
+
         with tempfile.NamedTemporaryFile(delete=True) as tmpfile:
             try:
-                subprocess.run(cmd + ["-f", tmpfile.name], check=True)
+                subprocess.run(cmd + ["-f", tmpfile.name], check=True, env=env)
             except subprocess.CalledProcessError:
                 # b.アップロード済みのダンプファイル削除
                 delete_uploaded_dump_file(uploaded_import_ids, fac_tables)
@@ -169,7 +178,7 @@ def upload_fac_dump_files(import_ids, fac_tables):
             try:
                 s3.upload_file(tmpfile.name, history_bucket_name, key)
                 uploaded_import_ids.append(import_id)
-            except ClientCursor:
+            except subprocess.CalledProcessError:
                 # b.アップロード済みのダンプファイル削除
                 delete_uploaded_dump_file(uploaded_import_ids, fac_tables)
                 # a.取込管理テーブル更新
@@ -196,7 +205,7 @@ def delete_fac_dump_file(import_ids, fac_tables, keep_count=2):
     keep_slice = sorted_ids[-min(keep_count, len(sorted_ids))]
     keep_counter = Counter(keep_slice)
 
-    s3 = boto3.client("s3", region_name="ap-northeast-1")
+    s3 = boto3.client("s3", region_name=AWS_REGION)
     success = True
     for import_id in import_ids:
         if keep_counter.get(import_id, 0) > 0:
@@ -208,7 +217,7 @@ def delete_fac_dump_file(import_ids, fac_tables, keep_count=2):
         key = f"{fac_data_master_table_name}/dump_{import_id}.dmp"
         try:
             s3.delete_object(Bucket=history_bucket_name, Key=key)
-        except ClientCursor:
+        except subprocess.CalledProcessError:
             logger.warning("BPW0027", import_id, key)
             success = False
 
@@ -237,13 +246,13 @@ def delete_uploaded_dump_file(uploaded_import_ids, fac_tables):
         return
 
     # S3クライアント作成
-    s3 = boto3.client("s3", region_name="ap-northeast-1")
+    s3 = boto3.client("s3", region_name=AWS_REGION)
     for uploaded_import_id in uploaded_import_ids:
         fac_data_master_table_name = fac_tables.get(uploaded_import_id)
         key = f"{fac_data_master_table_name}/dump_{uploaded_import_id}.dmp"
         try:
             s3.delete_object(Bucket=history_bucket_name, Key=key)
-        except ClientCursor:
+        except subprocess.CalledProcessError:
             logger.warning("BPW0028", uploaded_import_id, key)
 
 
