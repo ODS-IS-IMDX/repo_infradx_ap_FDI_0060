@@ -39,8 +39,9 @@ config = read_config(logger)
 secret_name = config["aws"]["secret_name"]
 secret_props = SecretPropertiesSingleton(secret_name, config, logger)
 
-# シークレットからマスタ管理スキーマ名を取得
-db_mst_schema = secret_props.get("db_mst_schema")
+
+# シークレットから設備データスキーマ名を取得
+db_fac_schema = secret_props.get("db_fac_schema")
 # シークレットマネージャーから履歴管理用ストレージ(S3)バケット名を取得
 history_bucket_name = secret_props.get("history_bucket_name")
 
@@ -112,10 +113,10 @@ def get_import_management_tables(import_ids):
             db_connection,
             logger,
             query,
-            params=(db_mst_schema, fac_data_master_table_name),
+            params=(db_fac_schema, fac_data_master_table_name),
             fetchone=True,
         )
-        if not result:
+        if not result or not result[0]:
             # a.取込管理テーブル更新
             update_import_management_for_deletion(
                 import_ids,
@@ -150,7 +151,7 @@ def upload_fac_dump_files(import_ids, fac_tables):
             "-d",
             secret_props.get("db_name"),
             "-t",
-            f"{db_mst_schema}.{fac_data_master_table_name}",
+            f"{db_fac_schema}.{fac_data_master_table_name}",
             "-F",
             "c",
         ]
@@ -162,7 +163,7 @@ def upload_fac_dump_files(import_ids, fac_tables):
         with tempfile.NamedTemporaryFile(delete=True) as tmpfile:
             try:
                 subprocess.run(cmd + ["-f", tmpfile.name], check=True, env=env)
-            except subprocess.CalledProcessError:
+            except Exception:
                 # b.アップロード済みのダンプファイル削除
                 delete_uploaded_dump_file(uploaded_import_ids, fac_tables)
                 # a.取込管理テーブル更新
@@ -178,7 +179,7 @@ def upload_fac_dump_files(import_ids, fac_tables):
             try:
                 s3.upload_file(tmpfile.name, history_bucket_name, key)
                 uploaded_import_ids.append(import_id)
-            except subprocess.CalledProcessError:
+            except Exception:
                 # b.アップロード済みのダンプファイル削除
                 delete_uploaded_dump_file(uploaded_import_ids, fac_tables)
                 # a.取込管理テーブル更新
@@ -217,7 +218,7 @@ def delete_fac_dump_file(import_ids, fac_tables, keep_count=2):
         key = f"{fac_data_master_table_name}/dump_{import_id}.dmp"
         try:
             s3.delete_object(Bucket=history_bucket_name, Key=key)
-        except subprocess.CalledProcessError:
+        except Exception:
             logger.warning("BPW0027", import_id, key)
             success = False
 
@@ -252,7 +253,7 @@ def delete_uploaded_dump_file(uploaded_import_ids, fac_tables):
         key = f"{fac_data_master_table_name}/dump_{uploaded_import_id}.dmp"
         try:
             s3.delete_object(Bucket=history_bucket_name, Key=key)
-        except subprocess.CalledProcessError:
+        except Exception:
             logger.warning("BPW0028", uploaded_import_id, key)
 
 
