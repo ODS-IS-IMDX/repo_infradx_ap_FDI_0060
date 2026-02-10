@@ -1,0 +1,30 @@
+# © 2026 NTT DATA Japan Co., Ltd. & NTT InfraNet All Rights Reserved.
+
+*.venv
+
+
+# Python 仮想環境のディレクトリ
+.venv/
+
+# Pythonによって生成されるバイトコードファイルやキャッシュを無視する
+__pycache__/
+*.py[cod]
+*.pyo
+
+# IDE関連
+.vscode/
+
+
+# その他
+log/
+*.log
+*.sqlite
+
+### 再発防止策 ###
+*.crt
+*.cer
+*.der
+*.pem
+*.key
+.aws/
+.env

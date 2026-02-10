@@ -1,0 +1,5 @@
+# © 2026 NTT DATA Japan Co., Ltd. & NTT InfraNet All Rights Reserved.
+
+boto3==1.40.74
+concurrent-log-handler==0.9.28
+psycopg2-binary==2.9.10
