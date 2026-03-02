@@ -1,3 +1,5 @@
+# © 2026 NTT DATA Japan Co., Ltd. & NTT InfraNet All Rights Reserved.
+
 """
 FDI_0060_historyManager.py
 
