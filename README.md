@@ -83,6 +83,13 @@
     ; ログファイルパス
     log_file_path = /infradx/logs/infradx-batch/infradx-batch.log
     ```
+    
+    **注意:** ログファイルの出力先ディレクトリが存在しない場合、ログ出力エラーが発生します。実行前に以下のいずれかの対応を行ってください。
+    - ログ出力ディレクトリを事前に作成する
+      ```bash
+      mkdir -p /infradx/logs/infradx-batch
+      ```
+    - または、`App/config/config.ini` の `log_file_path` を環境に合わせて変更する
 
 # 利用OSS一覧
 アプリケーションを利用するにあたり、以下OSSが必要です。
