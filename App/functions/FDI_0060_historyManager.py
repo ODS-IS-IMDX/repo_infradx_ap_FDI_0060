@@ -22,9 +22,10 @@ import re
 import subprocess
 import tempfile
 import traceback
-from collections import Counter
 
 import boto3
+from boto3.s3.transfer import TransferConfig
+from botocore.config import Config
 from core.config_reader import read_config
 from core.database import Database
 from core.logger import LogManager
@@ -82,7 +83,7 @@ def validate_inputs(import_id_param):
         logger.process_error_end()
 
     # フォーマットチェック
-    invalid_ids = [iid for iid in import_ids if not re.match(r"^[0-9_]+$", iid)]
+    invalid_ids = [iid for iid in import_ids if not re.match(r"^[0-9]+$", iid)]
     if invalid_ids:
         # a.取込管理テーブル更新
         update_import_management_for_deletion(
@@ -118,7 +119,7 @@ def get_import_management_tables(import_ids):
             params=(db_fac_schema, fac_data_master_table_name),
             fetchone=True,
         )
-        if not result or not result[0]:
+        if not result:
             # a.取込管理テーブル更新
             update_import_management_for_deletion(
                 import_ids,
@@ -134,14 +135,32 @@ def get_import_management_tables(import_ids):
 
 # 3. 設備データのダンプファイル取得・アップロード
 def upload_fac_dump_files(import_ids, fac_tables):
-    # S3クライアント作成
-    s3 = boto3.client("s3", region_name=AWS_REGION)
+    # S3クライアント作成(リトライ設定を強化)
+    retry_config = Config(
+        retries={
+            "max_attempts": 5,  # 最大リトライ回数を5回に設定
+            "mode": "adaptive",  # アダプティブリトライモード
+        },
+        connect_timeout=60,  # 接続タイムアウト: 60秒
+        read_timeout=300,  # 読み取りタイムアウト: 300秒(5分)
+        max_pool_connections=50,  # コネクションプール数
+    )
+    s3 = boto3.client("s3", region_name=AWS_REGION, config=retry_config)
+
+    # TransferConfig設定(マルチパートアップロードの最適化)
+    transfer_config = TransferConfig(
+        multipart_threshold=1024 * 1024 * 50,  # 50MB以上でマルチパート
+        multipart_chunksize=1024 * 1024 * 50,  # チャンクサイズ50MB
+        max_concurrency=10,  # 並行アップロード数
+        use_threads=True,  # マルチスレッド使用
+    )
+
     # アップロード済み取込IDリスト
     uploaded_import_ids = []
 
     for import_id in import_ids:
         fac_data_master_table_name = fac_tables.get(import_id)
-        key = f"{fac_data_master_table_name}/dump_{import_id}.dmp"
+        key = f"{fac_data_master_table_name}/dump_{import_id}.dump"
         cmd = [
             "pg_dump",
             "-h",
@@ -160,7 +179,7 @@ def upload_fac_dump_files(import_ids, fac_tables):
 
         # 環境変数にパスワードを設定
         env = os.environ.copy()
-        env["PGPASSWORD"] = secret_props.get("db_password")
+        env["PGPASSWORD"] = secret_props.get("db_pass")
 
         with tempfile.NamedTemporaryFile(delete=True) as tmpfile:
             try:
@@ -179,7 +198,10 @@ def upload_fac_dump_files(import_ids, fac_tables):
                 logger.process_error_end()
 
             try:
-                s3.upload_file(tmpfile.name, history_bucket_name, key)
+                # S3へアップロード(TransferConfigを使用してマルチパート対応)
+                s3.upload_file(
+                    tmpfile.name, history_bucket_name, key, Config=transfer_config
+                )
                 uploaded_import_ids.append(import_id)
             except Exception:
                 # b.アップロード済みのダンプファイル削除
@@ -204,24 +226,49 @@ def delete_fac_dump_file(import_ids, fac_tables, keep_count=2):
         cleaned = import_id.replace("_", "")
         return int(cleaned) if cleaned.isdigit() else cleaned
 
-    sorted_ids = sorted(import_ids, key=_sorting_value)
-    keep_slice = sorted_ids[-min(keep_count, len(sorted_ids))]
-    keep_counter = Counter(keep_slice)
+    pattern = re.compile(r"dump_(?P<import_id>.+)\.dump$")
 
     s3 = boto3.client("s3", region_name=AWS_REGION)
     success = True
     for import_id in import_ids:
-        if keep_counter.get(import_id, 0) > 0:
-            keep_counter[import_id] -= 1
-            continue
-
         fac_data_master_table_name = fac_tables.get(import_id)
+        prefix = f"{fac_data_master_table_name}/"
 
-        key = f"{fac_data_master_table_name}/dump_{import_id}.dmp"
+        stored_dumps = []
+        next_token = None
         try:
-            s3.delete_object(Bucket=history_bucket_name, Key=key)
+            while True:
+                params = {"Bucket": history_bucket_name, "Prefix": prefix}
+                if next_token:
+                    params["ContinuationToken"] = next_token
+                response = s3.list_objects_v2(**params)
+                for obj in response.get("Contents", []):
+                    key = obj.get("Key")
+                    match = pattern.search(key)
+                    if not match:
+                        continue
+                    stored_dumps.append((match.group("import_id"), key))
+                if not response.get("IsTruncated"):
+                    break
+                next_token = response.get("NextContinuationToken")
+            if not stored_dumps:
+                continue
+
+            sorted_dumps = sorted(
+                stored_dumps, key=lambda info: _sorting_value(info[0])
+            )
+            keep_count_eff = min(keep_count, len(sorted_dumps))
+            to_delete = (
+                sorted_dumps[: len(sorted_dumps) - keep_count_eff]
+                if keep_count_eff
+                else sorted_dumps
+            )
+
+            for _, key in to_delete:
+                s3.delete_object(Bucket=history_bucket_name, Key=key)
         except Exception:
-            logger.warning("BPW0027", import_id, key)
+            errorkey = f"{fac_data_master_table_name}/dump_{import_id}.dump"
+            logger.warning("BPW0027", import_id, errorkey)
             success = False
 
     return success
@@ -252,7 +299,7 @@ def delete_uploaded_dump_file(uploaded_import_ids, fac_tables):
     s3 = boto3.client("s3", region_name=AWS_REGION)
     for uploaded_import_id in uploaded_import_ids:
         fac_data_master_table_name = fac_tables.get(uploaded_import_id)
-        key = f"{fac_data_master_table_name}/dump_{uploaded_import_id}.dmp"
+        key = f"{fac_data_master_table_name}/dump_{uploaded_import_id}.dump"
         try:
             s3.delete_object(Bucket=history_bucket_name, Key=key)
         except Exception:
