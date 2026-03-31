@@ -30,10 +30,10 @@
         | ------------ | -------------------------------- |
         | repo_infradx_ap_BSC_0020         | 共通ライブラリとして使用します。 |
         
-        ※詳細は[リポジトリ一覧](#リポジトリ一覧)を参照
+        ※詳細は[リポジトリ一覧](https://github.com/ODS-IS-IMDX#%E3%83%AA%E3%83%9D%E3%82%B8%E3%83%88%E3%83%AA%E4%B8%80%E8%A6%A7)を参照
 
 5. PostgreSQL、PostGISの使用準備が完了していることが必要です。
-    - DDL実行については[repo_infradx_oss_DDL](https://github.com/infra-faci-pf/repo_infradx_oss_DDL)を参照してください。
+    - DDL実行については[repo_infradx_oss_DDL](https://github.com/ODS-IS-IMDX/repo_infradx_DDL)を参照してください。
 
 # リポジトリ利用方法
 必要なソフトウェアやサービスの詳細は[前提条件](#前提条件)をご参照ください。
